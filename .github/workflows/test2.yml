@@ -23,12 +23,12 @@ jobs:
     - name: Installing dependencies
       run: |
         sudo apt update
-        sudo apt install -y ninja-build libvulkan-dev build-essential gcc-arm-linux-gnueabi gcc-aarch64-linux-gnu libx11-dev libxinerama-dev libfreetype6-dev libglu1-mesa-dev libosmesa6-dev cmake unzip wget
+        sudo apt install -y ninja-build libvulkan-dev build-essential gcc-arm-linux-gnueabi gcc-aarch64-linux-gnu libx11-dev libxinerama-dev libfreetype6-dev libglu1-mesa-dev libosmesa6-dev cmake unzip wget autoconf automake libtool
 
     - name: Clone Wine repository
       run: |
-        git clone  https://github.com/wine-mirror/wine
-      
+        git clone https://github.com/wine-mirror/wine.git
+
     - name: Clone FEX repository
       run: |
         git clone https://github.com/FEX-Emu/FEX.git
@@ -41,20 +41,36 @@ jobs:
     - name: Build Wine for Android 64-bit
       run: |
         cd wine
-        mkdir -p build64
-        cmake -B build64 -GNinja -DCMAKE_SYSTEM_NAME=Android -Dvenus=true -DCMAKE_SYSTEM_VERSION=26 -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-26 -DCMAKE_ANDROID_ARCH_ABI=arm64-v8a -DCMAKE_ANDROID_NDK=${{ steps.setup-ndk.outputs.ndk-path }} -DANDROID_NDK=${{ steps.setup-ndk.outputs.ndk-path }} -DCMAKE_TOOLCHAIN_FILE=${{ steps.setup-ndk.outputs.ndk-path }}/build/cmake/android.toolchain.cmake
-        ninja -C build64
-        mkdir -p ${{ github.workspace }}/wine-build-64
-        cp -r build64/* ${{ github.workspace }}/wine-build-64
+        # Prepare environment for Wine build
+        export PATH=$PATH:${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin
+        export CC=aarch64-linux-android21-clang
+        export CXX=aarch64-linux-android21-clang++
+        export AR=aarch64-linux-android-ar
+        export RANLIB=aarch64-linux-android-ranlib
+        export LD=aarch64-linux-android-ld
+        export STRIP=aarch64-linux-android-strip
+        
+        # Configure Wine build
+        ./configure --host=aarch64-linux-android --prefix=$PWD/../wine-android-64
+        make
+        make install DESTDIR=$PWD/../wine-android-64
 
     - name: Build Wine for Android 32-bit
       run: |
         cd wine
-        mkdir -p build32
-        cmake -B build32 -GNinja -DCMAKE_SYSTEM_NAME=Android -Dvenus=true -DCMAKE_SYSTEM_VERSION=26 -DANDROID_ABI=armeabi-v7a -DANDROID_PLATFORM=android-26 -DCMAKE_ANDROID_ARCH_ABI=armeabi-v7a -DCMAKE_ANDROID_NDK=${{ steps.setup-ndk.outputs.ndk-path }} -DANDROID_NDK=${{ steps.setup-ndk.outputs.ndk-path }} -DCMAKE_TOOLCHAIN_FILE=${{ steps.setup-ndk.outputs.ndk-path }}/build/cmake/android.toolchain.cmake
-        ninja -C build32
-        mkdir -p ${{ github.workspace }}/wine-build-32
-        cp -r build32/* ${{ github.workspace }}/wine-build-32
+        # Prepare environment for Wine build
+        export PATH=$PATH:${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin
+        export CC=arm-linux-androideabi21-clang
+        export CXX=arm-linux-androideabi21-clang++
+        export AR=arm-linux-androideabi-ar
+        export RANLIB=arm-linux-androideabi-ranlib
+        export LD=arm-linux-androideabi-ld
+        export STRIP=arm-linux-androideabi-strip
+
+        # Configure Wine build
+        ./configure --host=arm-linux-androideabi --prefix=$PWD/../wine-android-32
+        make
+        make install DESTDIR=$PWD/../wine-android-32
 
     - name: Build FEX for Android 64-bit
       run: |
@@ -79,14 +95,14 @@ jobs:
         mkdir output
         mkdir output/wine
         mkdir output/fex
-        cp -r ${{ github.workspace }}/wine-build-64/* output/wine/
+        cp -r ${{ github.workspace }}/wine-android-64/* output/wine/
         cp -r ${{ github.workspace }}/fex-build-64/* output/fex/
         zip -r wine_fex_android_build_64.zip output/wine output/fex
 
         mkdir output32
         mkdir output32/wine
         mkdir output32/fex
-        cp -r ${{ github.workspace }}/wine-build-32/* output32/wine/
+        cp -r ${{ github.workspace }}/wine-android-32/* output32/wine/
         cp -r ${{ github.workspace }}/fex-build-32/* output32/fex/
         zip -r wine_fex_android_build_32.zip output32/wine output32/fex
 
