@@ -10,9 +10,9 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      NDK_VERSION: r26b  # Versão do NDK que deseja usar
-      ANDROID_NDK_HOME: ${{ runner.temp }}/android-ndk-$NDK_VERSION
-      TOOLCHAIN: ${{ runner.temp }}/toolchain
+      NDK_VERSION: r26b  # Version of the NDK to use
+      ANDROID_NDK_HOME: ${{ env.TEMP }}/android-ndk-${{ env.NDK_VERSION }}
+      TOOLCHAIN: ${{ env.TEMP }}/toolchain
 
     steps:
       - name: Checkout only workflow files
@@ -20,33 +20,33 @@ jobs:
         with:
           path: .github
 
-      # Git clone do Wine
+      # Git clone Wine repository
       - name: Clone Wine repository
         run: |
           git clone https://github.com/wine-mirror/wine.git
 
-      # Git clone do FEX
+      # Git clone FEX repository
       - name: Clone FEX repository
         run: |
           git clone https://github.com/FEX-Emu/FEX.git
 
-      # Baixar e configurar o Android NDK
+      # Download and configure Android NDK
       - name: Download Android NDK
         run: |
           wget https://dl.google.com/android/repository/android-ndk-${{ env.NDK_VERSION }}-linux.zip
-          unzip android-ndk-${{ env.NDK_VERSION }}-linux.zip -d ${{ runner.temp }}
+          unzip android-ndk-${{ env.NDK_VERSION }}-linux.zip -d ${{ env.TEMP }}
 
       - name: Set up Android toolchain
         run: |
           $ANDROID_NDK_HOME/build/tools/make_standalone_toolchain.py --arch arm64 --install-dir ${{ env.TOOLCHAIN }}
 
-      # Instalar dependências para compilar o Wine e FEX
+      # Install dependencies for building Wine and FEX
       - name: Install dependencies
         run: |
           sudo apt update
           sudo apt install -y build-essential gcc-arm-linux-gnueabi gcc-aarch64-linux-gnu libx11-dev libxinerama-dev libfreetype6-dev libglu1-mesa-dev libosmesa6-dev cmake
 
-      # Compilar Wine para Android
+      # Build Wine for Android
       - name: Compile Wine for Android
         run: |
           cd wine
@@ -54,7 +54,7 @@ jobs:
           make -j$(nproc)
           make install DESTDIR=$GITHUB_WORKSPACE/wine-build
 
-      # Compilar FEX para Android
+      # Build FEX for Android
       - name: Compile FEX for Android
         run: |
           cd FEX
@@ -63,7 +63,7 @@ jobs:
           make -j$(nproc)
           make install DESTDIR=$GITHUB_WORKSPACE/fex-build
 
-      # Compactar Wine e FEX em um arquivo .zip
+      # Create ZIP with Wine and FEX
       - name: Create ZIP with Wine and FEX
         run: |
           mkdir output
@@ -71,7 +71,7 @@ jobs:
           cp -r $GITHUB_WORKSPACE/fex-build/* output/
           zip -r wine_fex_android_build.zip output/
 
-      # Fazer upload do arquivo .zip
+      # Upload the ZIP file
       - name: Upload artifact
         uses: actions/upload-artifact@v2
         with:
