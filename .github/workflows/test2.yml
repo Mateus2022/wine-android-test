@@ -1,0 +1,104 @@
+name: Build Wine and FEX for Android 2 (mateus)
+
+on:
+  workflow_dispatch:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+
+jobs:
+  build:
+    name: "Build Wine and FEX for Android"
+    runs-on: ubuntu-latest
+    steps:
+    - name: Installing dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y ninja-build libvulkan-dev build-essential gcc-arm-linux-gnueabi gcc-aarch64-linux-gnu libx11-dev libxinerama-dev libfreetype6-dev libglu1-mesa-dev libosmesa6-dev cmake unzip wget
+
+    - name: Clone Wine repository
+      uses: actions/checkout@v3
+      with:
+        submodules: recursive
+
+    - name: Clone FEX repository
+      run: |
+        git clone https://github.com/FEX-Emu/FEX.git
+
+    - uses: nttld/setup-ndk@v1
+      id: setup-ndk
+      with:
+        ndk-version: r26b
+
+    - name: Build Wine for Android 64-bit
+      run: |
+        cd wine
+        mkdir -p build64
+        cmake -B build64 -GNinja -DCMAKE_SYSTEM_NAME=Android -Dvenus=true -DCMAKE_SYSTEM_VERSION=26 -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-26 -DCMAKE_ANDROID_ARCH_ABI=arm64-v8a -DCMAKE_ANDROID_NDK=${{ steps.setup-ndk.outputs.ndk-path }} -DANDROID_NDK=${{ steps.setup-ndk.outputs.ndk-path }} -DCMAKE_TOOLCHAIN_FILE=${{ steps.setup-ndk.outputs.ndk-path }}/build/cmake/android.toolchain.cmake
+        ninja -C build64
+        mkdir -p ${{ github.workspace }}/wine-build-64
+        cp -r build64/* ${{ github.workspace }}/wine-build-64
+
+    - name: Build Wine for Android 32-bit
+      run: |
+        cd wine
+        mkdir -p build32
+        cmake -B build32 -GNinja -DCMAKE_SYSTEM_NAME=Android -Dvenus=true -DCMAKE_SYSTEM_VERSION=26 -DANDROID_ABI=armeabi-v7a -DANDROID_PLATFORM=android-26 -DCMAKE_ANDROID_ARCH_ABI=armeabi-v7a -DCMAKE_ANDROID_NDK=${{ steps.setup-ndk.outputs.ndk-path }} -DANDROID_NDK=${{ steps.setup-ndk.outputs.ndk-path }} -DCMAKE_TOOLCHAIN_FILE=${{ steps.setup-ndk.outputs.ndk-path }}/build/cmake/android.toolchain.cmake
+        ninja -C build32
+        mkdir -p ${{ github.workspace }}/wine-build-32
+        cp -r build32/* ${{ github.workspace }}/wine-build-32
+
+    - name: Build FEX for Android 64-bit
+      run: |
+        cd FEX
+        mkdir build64 && cd build64
+        cmake .. -DCMAKE_TOOLCHAIN_FILE=${{ steps.setup-ndk.outputs.ndk-path }}/build/cmake/android.toolchain.cmake -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-26
+        ninja
+        mkdir -p ${{ github.workspace }}/fex-build-64
+        cp -r build64/* ${{ github.workspace }}/fex-build-64
+
+    - name: Build FEX for Android 32-bit
+      run: |
+        cd FEX
+        mkdir build32 && cd build32
+        cmake .. -DCMAKE_TOOLCHAIN_FILE=${{ steps.setup-ndk.outputs.ndk-path }}/build/cmake/android.toolchain.cmake -DANDROID_ABI=armeabi-v7a -DANDROID_PLATFORM=android-26
+        ninja
+        mkdir -p ${{ github.workspace }}/fex-build-32
+        cp -r build32/* ${{ github.workspace }}/fex-build-32
+
+    - name: Create ZIP files with Wine and FEX
+      run: |
+        mkdir output
+        mkdir output/wine
+        mkdir output/fex
+        cp -r ${{ github.workspace }}/wine-build-64/* output/wine/
+        cp -r ${{ github.workspace }}/fex-build-64/* output/fex/
+        zip -r wine_fex_android_build_64.zip output/wine output/fex
+
+        mkdir output32
+        mkdir output32/wine
+        mkdir output32/fex
+        cp -r ${{ github.workspace }}/wine-build-32/* output32/wine/
+        cp -r ${{ github.workspace }}/fex-build-32/* output32/fex/
+        zip -r wine_fex_android_build_32.zip output32/wine output32/fex
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: wine-fex-android-64
+        path: wine_fex_android_build_64.zip
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: wine-fex-android-32
+        path: wine_fex_android_build_32.zip
