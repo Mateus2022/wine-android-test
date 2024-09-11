@@ -26,10 +26,9 @@ jobs:
         sudo apt install -y ninja-build libvulkan-dev build-essential gcc-arm-linux-gnueabi gcc-aarch64-linux-gnu libx11-dev libxinerama-dev libfreetype6-dev libglu1-mesa-dev libosmesa6-dev cmake unzip wget
 
     - name: Clone Wine repository
-      uses: actions/checkout@v3
-      with:
-        submodules: recursive
-
+      run: |
+        git clone  https://github.com/wine-mirror/wine
+      
     - name: Clone FEX repository
       run: |
         git clone https://github.com/FEX-Emu/FEX.git
