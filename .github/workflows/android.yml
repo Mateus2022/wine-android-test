@@ -1,4 +1,4 @@
-name: Build Wine and FEX for Android
+name: Build Wine and FEX for Android 2 (dunkly)
 
 on:
   workflow_dispatch
