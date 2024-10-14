@@ -1,127 +1,31 @@
-name: Build Wine and FEX for Android 2 (mateus)
+name: Setup RDP on Windows
 
-on:
-  workflow_dispatch:
-    branches:
-      - main
-  push:
-    branches:
-      - main
-    paths-ignore:
-      - '**.md'
-  pull_request:
-    branches:
-      - main
-    paths-ignore:
-      - '**.md'
+on: [push]
 
 jobs:
-  build:
-    name: "Build Wine and FEX for Android"
-    runs-on: ubuntu-latest
+  setup-rdp:
+    runs-on: windows-latest
+
     steps:
-    - name: Installing dependencies
-      run: |
-        sudo apt update
-        sudo apt install -y ninja-build libvulkan-dev build-essential gcc-arm-linux-gnueabi gcc-aarch64-linux-gnu libx11-dev libxinerama-dev libfreetype6-dev libglu1-mesa-dev libosmesa6-dev cmake unzip wget autoconf automake libtool
+      - name: Ativar Remote Desktop
+        run: |
+          # Ativar Remote Desktop e permitir conexões
+          $rdpKey = "HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server"
+          Set-ItemProperty -Path $rdpKey -Name "fDenyTSConnections" -Value 0
+          Set-ItemProperty -Path $rdpKey -Name "UserAuthentication" -Value 1
 
-    - name: Clone Wine repository
-      run: |
-        git clone https://github.com/wine-mirror/wine.git
+      - name: Configurar Firewall
+        run: |
+          # Permitir conexões RDP no firewall
+          New-NetFirewallRule -DisplayName "Allow RDP" -Direction Inbound -Protocol TCP -Action Allow -LocalPort 3389
 
-    - name: Clone FEX repository
-      run: |
-        git clone https://github.com/FEX-Emu/FEX.git
+      - name: Mostrar Endereço IP
+        run: |
+          # Mostrar o endereço IP na tela
+          Get-NetIPAddress | Where-Object { $_.AddressFamily -eq "IPv4" } | Select-Object IPAddress
 
-    - uses: nttld/setup-ndk@v1
-      id: setup-ndk
-      with:
-        ndk-version: r26b
-
-    - name: Prepare Wine Tools
-      run: |
-        cd wine
-        mkdir -p tools
-        cd tools
-        wget https://dl.winehq.org/wine/source/1.x/wine-1.0.1.tar.gz
-        tar -xzf wine-1.0.1.tar.gz
-        cd wine-1.0.1
-        ./configure --prefix=$PWD/../wine-tools
-        make
-        make install
-
-    - name: Build Wine for Android 64-bit
-      run: |
-        cd wine
-        export PATH=$PATH:${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin
-        export CC=aarch64-linux-android21-clang
-        export CXX=aarch64-linux-android21-clang++
-        export AR=aarch64-linux-android-ar
-        export RANLIB=aarch64-linux-android-ranlib
-        export LD=aarch64-linux-android-ld
-        export STRIP=aarch64-linux-android-strip
-        
-        ./configure --host=aarch64-linux-android --prefix=$PWD/../wine-android-64 --with-wine-tools=$PWD/tools/wine-tools
-        make
-        make install DESTDIR=$PWD/../wine-android-64
-
-    - name: Build Wine for Android 32-bit
-      run: |
-        cd wine
-        export PATH=$PATH:${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin
-        export CC=arm-linux-androideabi21-clang
-        export CXX=arm-linux-androideabi21-clang++
-        export AR=arm-linux-androideabi-ar
-        export RANLIB=arm-linux-androideabi-ranlib
-        export LD=arm-linux-androideabi-ld
-        export STRIP=arm-linux-androideabi-strip
-
-        ./configure --host=arm-linux-androideabi --prefix=$PWD/../wine-android-32 --with-wine-tools=$PWD/tools/wine-tools
-        make
-        make install DESTDIR=$PWD/../wine-android-32
-
-    - name: Build FEX for Android 64-bit
-      run: |
-        cd FEX
-        mkdir build64 && cd build64
-        cmake .. -DCMAKE_TOOLCHAIN_FILE=${{ steps.setup-ndk.outputs.ndk-path }}/build/cmake/android.toolchain.cmake -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-26
-        ninja
-        mkdir -p ${{ github.workspace }}/fex-build-64
-        cp -r build64/* ${{ github.workspace }}/fex-build-64
-
-    - name: Build FEX for Android 32-bit
-      run: |
-        cd FEX
-        mkdir build32 && cd build32
-        cmake .. -DCMAKE_TOOLCHAIN_FILE=${{ steps.setup-ndk.outputs.ndk-path }}/build/cmake/android.toolchain.cmake -DANDROID_ABI=armeabi-v7a -DANDROID_PLATFORM=android-26
-        ninja
-        mkdir -p ${{ github.workspace }}/fex-build-32
-        cp -r build32/* ${{ github.workspace }}/fex-build-32
-
-    - name: Create ZIP files with Wine and FEX
-      run: |
-        mkdir output
-        mkdir output/wine
-        mkdir output/fex
-        cp -r ${{ github.workspace }}/wine-android-64/* output/wine/
-        cp -r ${{ github.workspace }}/fex-build-64/* output/fex/
-        zip -r wine_fex_android_build_64.zip output/wine output/fex
-
-        mkdir output32
-        mkdir output32/wine
-        mkdir output32/fex
-        cp -r ${{ github.workspace }}/wine-android-32/* output32/wine/
-        cp -r ${{ github.workspace }}/fex-build-32/* output32/fex/
-        zip -r wine_fex_android_build_32.zip output32/wine output32/fex
-
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v3
-      with:
-        name: wine-fex-android-64
-        path: wine_fex_android_build_64.zip
-
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v3
-      with:
-        name: wine-fex-android-32
-        path: wine_fex_android_build_32.zip
+      - name: Manter job ativo
+        run: |
+          # Manter o job ativo, sem loop infinito
+          Write-Host "O job está ativo. Você pode visualizar as saídas acima."
+          Start-Sleep -Seconds 86400  # Esperar por um dia (86400 segundos)
