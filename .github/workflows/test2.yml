@@ -1,52 +1,37 @@
-name: Setup RDP and Generate RDP File
+name: Install AnyDesk and Keep Running
 
 on:
-  workflow_dispatch:  # Permite execução manual
+  push:
+    branches:
+      - main
 
 jobs:
-  setup-rdp:
+  install-anydesk:
     runs-on: windows-latest
-
     steps:
-      - name: Baixar e instalar RDP
+      - name: Download AnyDesk
         run: |
-          # O RDP já vem instalado na imagem do Windows do GitHub Actions, então essa etapa é opcional.
-          Write-Host "RDP já está disponível na imagem do Windows."
+          Invoke-WebRequest -Uri "https://download.anydesk.com/downloads/AnyDesk.exe" -OutFile "C:\AnyDesk.exe"
 
-      - name: Iniciar o servidor RDP
+      - name: Install AnyDesk
         run: |
-          # Iniciar o serviço de RDP
-          Start-Service -Name "TermService"
-          Write-Host "Servidor RDP iniciado."
+          Start-Process -FilePath "C:\AnyDesk.exe" -ArgumentList "/install /quiet" -Wait
 
-      - name: Configurar RDP e gerar arquivo .rdp
+      - name: Start AnyDesk
         run: |
-          $rdpFilePath = "C:\Users\runneradmin\Desktop\MyConnection.rdp"
-          $rdpContent = @"
-          full address:s:localhost:3389
-          username:s:Administrator
-          redirectclipboard:i:1
-          security:transport
-          administrative session:i:1
-          "@
-          $rdpContent | Out-File -FilePath $rdpFilePath -Encoding ASCII
-          Write-Host "Arquivo RDP gerado em: $rdpFilePath"
+          Start-Process "C:\Program Files (x86)\AnyDesk\AnyDesk.exe"
+          Start-Sleep -Seconds 5  # Aguardar para garantir que o AnyDesk inicie
 
-      - name: Exibir conteúdo do arquivo RDP
+      - name: Display AnyDesk ID and Connection Info
         run: |
-          $rdpFilePath = "C:\Users\runneradmin\Desktop\MyConnection.rdp"
-          $content = Get-Content -Path $rdpFilePath
-          Write-Host "Conteúdo do arquivo RDP:"
-          Write-Host $content
+          # Aguarda um tempo para o AnyDesk inicializar completamente
+          Start-Sleep -Seconds 10
+          
+          # Mostra o ID do AnyDesk
+          $anyDeskID = Get-Content "C:\Program Files (x86)\AnyDesk\ad.ini" | Select-String "id" | ForEach-Object { $_.ToString().Split('=')[1] }
+          Write-Host "AnyDesk ID: $anyDeskID"
 
-      - name: Publicar arquivo RDP como artefato
-        uses: actions/upload-artifact@v3
-        with:
-          name: MyConnection
-          path: C:\Users\runneradmin\Desktop\MyConnection.rdp
-
-      - name: Manter o processo em execução
+      - name: Keep Job Active
         run: |
-          Write-Host "O job está ativo e aguardando por conexões RDP."
-          # Manter o job ativo por 1 dia (86400 segundos)
+          # Manter o job ativo por 24 horas
           Start-Sleep -Seconds 86400
