@@ -1,31 +1,31 @@
-name: Setup RDP on Windows
+name: Run TeamViewer Setup
 
-on: [push]
+on:
+  workflow_dispatch:  # Permite execução manual
 
 jobs:
-  setup-rdp:
+  setup-teamviewer:
     runs-on: windows-latest
 
     steps:
-      - name: Ativar Remote Desktop
+      - name: Baixar TeamViewer
         run: |
-          # Ativar Remote Desktop e permitir conexões
-          $rdpKey = "HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server"
-          Set-ItemProperty -Path $rdpKey -Name "fDenyTSConnections" -Value 0
-          Set-ItemProperty -Path $rdpKey -Name "UserAuthentication" -Value 1
+          Invoke-WebRequest -Uri "https://download.teamviewer.com/download/TeamViewer.exe" -OutFile "TeamViewer.exe"
 
-      - name: Configurar Firewall
+      - name: Instalar TeamViewer
         run: |
-          # Permitir conexões RDP no firewall
-          New-NetFirewallRule -DisplayName "Allow RDP" -Direction Inbound -Protocol TCP -Action Allow -LocalPort 3389
+          Start-Process -FilePath "TeamViewer.exe" -ArgumentList "/S" -Wait
 
-      - name: Mostrar Endereço IP
+      - name: Manter o processo em execução
         run: |
-          # Mostrar o endereço IP na tela
-          Get-NetIPAddress | Where-Object { $_.AddressFamily -eq "IPv4" } | Select-Object IPAddress
+          for ($i=0; $i -lt 24; $i++) {
+            Write-Host "Executando loop número $($i + 1) - Aguardando 1 hora."
+            Start-Sleep -Seconds 3600  # Aguardando 1 hora
+          }
 
-      - name: Manter job ativo
+      - name: Mostrar informações de conexão
         run: |
-          # Manter o job ativo, sem loop infinito
-          Write-Host "O job está ativo. Você pode visualizar as saídas acima."
-          Start-Sleep -Seconds 86400  # Esperar por um dia (86400 segundos)
+          $teamViewerId = Get-Content "$env:APPDATA\TeamViewer\TeamViewer.ini" | Select-String -Pattern "ClientID" | ForEach-Object { $_.ToString().Split('=')[1].Trim() }
+          Write-Host "Para conectar ao TeamViewer, use o seguinte ID:"
+          Write-Host "ID do TeamViewer: $teamViewerId"
+          Write-Host "Acesso: Verifique a senha no aplicativo TeamViewer."
