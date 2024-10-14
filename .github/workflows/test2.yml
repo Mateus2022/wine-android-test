@@ -8,10 +8,16 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - name: Instalar RDP
+      - name: Baixar e instalar RDP
         run: |
-          # Neste caso, o RDP já deve estar disponível na imagem do Windows, então não há instalação adicional necessária.
+          # O RDP já vem instalado na imagem do Windows do GitHub Actions, então essa etapa é opcional.
           Write-Host "RDP já está disponível na imagem do Windows."
+
+      - name: Iniciar o servidor RDP
+        run: |
+          # Iniciar o serviço de RDP
+          Start-Service -Name "TermService"
+          Write-Host "Servidor RDP iniciado."
 
       - name: Configurar RDP e gerar arquivo .rdp
         run: |
@@ -25,6 +31,13 @@ jobs:
           "@
           $rdpContent | Out-File -FilePath $rdpFilePath -Encoding ASCII
           Write-Host "Arquivo RDP gerado em: $rdpFilePath"
+
+      - name: Exibir conteúdo do arquivo RDP
+        run: |
+          $rdpFilePath = "C:\Users\runneradmin\Desktop\MyConnection.rdp"
+          $content = Get-Content -Path $rdpFilePath
+          Write-Host "Conteúdo do arquivo RDP:"
+          Write-Host $content
 
       - name: Publicar arquivo RDP como artefato
         uses: actions/upload-artifact@v3
