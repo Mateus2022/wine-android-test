@@ -1,37 +1,39 @@
-name: Setup TeamViewer QuickSupport
+name: Setup RDP and Generate RDP File
 
 on:
   workflow_dispatch:  # Permite execução manual
 
 jobs:
-  setup-teamviewer:
+  setup-rdp:
     runs-on: windows-latest
 
     steps:
-      - name: Baixar TeamViewer QuickSupport
+      - name: Instalar RDP
         run: |
-          Invoke-WebRequest -Uri "https://download.teamviewer.com/download/TeamViewerQS_x64.exe" -OutFile "TeamViewerQS.exe"
+          # Neste caso, o RDP já deve estar disponível na imagem do Windows, então não há instalação adicional necessária.
+          Write-Host "RDP já está disponível na imagem do Windows."
 
-      - name: Instalar TeamViewer QuickSupport
+      - name: Configurar RDP e gerar arquivo .rdp
         run: |
-          Start-Process -FilePath "TeamViewerQS.exe" -ArgumentList "/S" -Wait
+          $rdpFilePath = "C:\Users\runneradmin\Desktop\MyConnection.rdp"
+          $rdpContent = @"
+          full address:s:localhost:3389
+          username:s:Administrator
+          redirectclipboard:i:1
+          security:transport
+          administrative session:i:1
+          "@
+          $rdpContent | Out-File -FilePath $rdpFilePath -Encoding ASCII
+          Write-Host "Arquivo RDP gerado em: $rdpFilePath"
 
-      - name: Iniciar TeamViewer
-        run: |
-          Start-Process -FilePath "C:\Program Files (x86)\TeamViewer\TeamViewer.exe"
+      - name: Publicar arquivo RDP como artefato
+        uses: actions/upload-artifact@v3
+        with:
+          name: MyConnection
+          path: C:\Users\runneradmin\Desktop\MyConnection.rdp
 
-      - name: Mostrar informações de conexão
-        run: |
-          # Aguarda 10 segundos para o TeamViewer iniciar e então mostra informações
-          Start-Sleep -Seconds 10
-          $teamViewerId = Get-Content "$env:APPDATA\TeamViewer\TeamViewerQS.ini" | Select-String -Pattern "ClientID" | ForEach-Object { $_.ToString().Split('=')[1].Trim() }
-          Write-Host "Para conectar ao TeamViewer, use o seguinte ID:"
-          Write-Host "ID do TeamViewer: $teamViewerId"
-          Write-Host "Acesso: Verifique a senha no aplicativo TeamViewer."
-      
       - name: Manter o processo em execução
         run: |
-          while ($true) {
-            Write-Host "Serviço do TeamViewer em execução. Aguardando conexões..."
-            Start-Sleep -Seconds 3600  # Aguardando 1 hora entre iterações
-          }
+          Write-Host "O job está ativo e aguardando por conexões RDP."
+          # Manter o job ativo por 1 dia (86400 segundos)
+          Start-Sleep -Seconds 86400
