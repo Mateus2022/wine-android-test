@@ -1,4 +1,4 @@
-name: Install AnyDesk and Keep Running
+name: Setup SSH on Ubuntu
 
 on:
   push:
@@ -6,32 +6,26 @@ on:
       - main
 
 jobs:
-  install-anydesk:
-    runs-on: windows-latest
+  setup-ssh:
+    runs-on: ubuntu-latest
     steps:
-      - name: Download AnyDesk
+      - name: Update and install SSH
         run: |
-          Invoke-WebRequest -Uri "https://download.anydesk.com/downloads/AnyDesk.exe" -OutFile "C:\AnyDesk.exe"
+          sudo apt-get update
+          sudo apt-get install -y openssh-server
+          sudo systemctl enable ssh
+          sudo systemctl start ssh
+          sudo ufw allow ssh
 
-      - name: Install AnyDesk
+      - name: Show SSH connection info
         run: |
-          Start-Process -FilePath "C:\AnyDesk.exe" -ArgumentList "/install /quiet" -Wait
+          echo "Server is ready for SSH connection"
+          echo "-----------------------------------"
+          echo "Username: $USER"
+          echo "IP Address: $(curl ifconfig.me)"
+          echo "SSH Port: 22 (default)"
+          echo "-----------------------------------"
 
-      - name: Start AnyDesk
+      - name: Keep job running for 1 day
         run: |
-          Start-Process "C:\Program Files (x86)\AnyDesk\AnyDesk.exe"
-          Start-Sleep -Seconds 5  # Aguardar para garantir que o AnyDesk inicie
-
-      - name: Display AnyDesk ID and Connection Info
-        run: |
-          # Aguarda um tempo para o AnyDesk inicializar completamente
-          Start-Sleep -Seconds 10
-          
-          # Mostra o ID do AnyDesk
-          $anyDeskID = Get-Content "C:\Program Files (x86)\AnyDesk\ad.ini" | Select-String "id" | ForEach-Object { $_.ToString().Split('=')[1] }
-          Write-Host "AnyDesk ID: $anyDeskID"
-
-      - name: Keep Job Active
-        run: |
-          # Manter o job ativo por 24 horas
-          Start-Sleep -Seconds 86400
+          sleep 86400
