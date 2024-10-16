@@ -1,12 +1,11 @@
-name: Ubuntu ARM64 Remote Desktop (RDP)
+name: Ubuntu Remote Desktop (RDP)
 
 on: 
   workflow_dispatch:  # Permite iniciar o workflow manualmente
 
 jobs:
   ubuntu-rdp:
-    runs-on: ubuntu-22.04
-    architecture: arm64
+    runs-on: ubuntu-latest  # Usa o runner padrão do GitHub (x86_64)
 
     steps:
       - name: Atualizar e instalar pacotes necessários
