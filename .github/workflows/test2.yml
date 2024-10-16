@@ -1,31 +1,48 @@
-name: Setup SSH on Ubuntu
+name: Ubuntu ARM64 Remote Desktop (RDP)
 
-on:
-  push:
-    branches:
-      - main
+on: 
+  workflow_dispatch:  # Permite iniciar o workflow manualmente
 
 jobs:
-  setup-ssh:
-    runs-on: ubuntu-latest
+  ubuntu-rdp:
+    runs-on: ubuntu-22.04
+    architecture: arm64
+
     steps:
-      - name: Update and install SSH
+      - name: Atualizar e instalar pacotes necessários
         run: |
           sudo apt-get update
-          sudo apt-get install -y openssh-server
-          sudo systemctl enable ssh
-          sudo systemctl start ssh
-          sudo ufw allow ssh
+          sudo apt-get install -y xfce4 xfce4-goodies xrdp
+          
+          # Ativar e iniciar o serviço xrdp
+          sudo systemctl enable xrdp
+          sudo systemctl start xrdp
 
-      - name: Show SSH connection info
-        run: |
-          echo "Server is ready for SSH connection"
-          echo "-----------------------------------"
-          echo "Username: $USER"
-          echo "IP Address: $(curl ifconfig.me)"
-          echo "SSH Port: 22 (default)"
-          echo "-----------------------------------"
+          # Configura a sessão XFCE4 para o RDP
+          echo "xfce4-session" > ~/.xsession
+          sudo service xrdp restart
+        shell: bash
 
-      - name: Keep job running for 1 day
+      - name: Definir senha do usuário padrão
         run: |
-          sleep 86400
+          # Define a senha para o usuário "runner" (alterar conforme preferir)
+          sudo useradd -m -s /bin/bash myuser
+          echo 'myuser:mysuperpassword' | sudo chpasswd
+          sudo adduser myuser ssl-cert  # Adiciona o usuário ao grupo necessário para o xrdp
+        shell: bash
+
+      - name: Exibir informações de conexão (Endereço IP, usuário e senha)
+        run: |
+          # Obter o endereço IP público da instância
+          IP=$(curl -s http://ifconfig.me)
+          echo "Conecte-se ao servidor usando os seguintes detalhes:"
+          echo "Endereço IP: $IP"
+          echo "Usuário: myuser"
+          echo "Senha: mysuperpassword"
+        shell: bash
+
+      - name: Manter o servidor ativo por 1 dia
+        run: |
+          echo "Mantendo o servidor rodando por 24 horas..."
+          sleep 86400  # Pausa por 24 horas
+        shell: bash
