@@ -1,47 +1,79 @@
-name: Ubuntu Remote Desktop (RDP)
+name: Build VirtualGL for ARM
 
-on: 
-  workflow_dispatch:  # Permite iniciar o workflow manualmente
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
-  ubuntu-rdp:
-    runs-on: ubuntu-latest  # Usa o runner padrão do GitHub (x86_64)
+  build-deb:
+    runs-on: ubuntu-20.04
+
+    services:
+      qemu:
+        image: multiarch/qemu-user-static
+        options: --privileged
+        volumes:
+          - /dev:/dev
+        ports:
+          - 12345:12345
 
     steps:
-      - name: Atualizar e instalar pacotes necessários
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+
+      - name: Set up QEMU
         run: |
           sudo apt-get update
-          sudo apt-get install -y xfce4 xfce4-goodies xrdp
-          
-          # Ativar e iniciar o serviço xrdp
-          sudo systemctl enable xrdp
-          sudo systemctl start xrdp
+          sudo apt-get install -y qemu qemu-user-static binfmt-support debootstrap schroot
 
-          # Configura a sessão XFCE4 para o RDP
-          echo "xfce4-session" > ~/.xsession
-          sudo service xrdp restart
-        shell: bash
-
-      - name: Definir senha do usuário padrão
+      - name: Set up ARM environment
         run: |
-          # Define a senha para o usuário "runner" (alterar conforme preferir)
-          sudo useradd -m -s /bin/bash myuser
-          echo 'myuser:mysuperpassword' | sudo chpasswd
-          sudo adduser myuser ssl-cert  # Adiciona o usuário ao grupo necessário para o xrdp
-        shell: bash
+          sudo apt-get install -y qemu-user-static
+          sudo update-binfmts --enable qemu-arm
+          sudo update-binfmts --enable qemu-aarch64
 
-      - name: Exibir informações de conexão (Endereço IP, usuário e senha)
+      - name: Install dependencies for building VirtualGL
         run: |
-          # Obter o endereço IP público da instância
-          IP=$(curl -s http://ifconfig.me)
-          echo "Conecte-se ao servidor usando os seguintes detalhes:"
-          echo "Endereço IP: $IP"
-          echo "Usuário: myuser"
-          echo "Senha: mysuperpassword"
-        shell: bash
+          sudo apt-get install -y build-essential cmake libjpeg-dev libx11-dev libxext-dev
 
-      - name: Manter o servidor ativo por 1 dia
+      - name: Build VirtualGL for ARM64
         run: |
-          echo "Mantendo o servidor rodando por 24 horas..."
-          sleep 86400  # Pausa por 24 horas
-        shell: bash
+          sudo qemu-aarch64-static /bin/bash -c "
+          sudo apt-get update &&
+          sudo apt-get install -y dpkg-dev debhelper &&
+          mkdir -p virtualgl-arm64 &&
+          cd virtualgl-arm64 &&
+          cmake .. &&
+          make &&
+          make package &&
+          sudo dpkg-deb --build ./path_to_build_output_arm64
+          "
+
+      - name: Build VirtualGL for ARM32
+        run: |
+          sudo qemu-arm-static /bin/bash -c "
+          sudo apt-get update &&
+          sudo apt-get install -y dpkg-dev debhelper &&
+          mkdir -p virtualgl-arm32 &&
+          cd virtualgl-arm32 &&
+          cmake .. &&
+          make &&
+          make package &&
+          sudo dpkg-deb --build ./path_to_build_output_arm32
+          "
+
+      - name: Upload ARM64 .deb package
+        uses: actions/upload-artifact@v3
+        with:
+          name: virtualgl-arm64.deb
+          path: ./virtualgl-arm64/path_to_build_output_arm64/virtualgl-arm64.deb
+
+      - name: Upload ARM32 .deb package
+        uses: actions/upload-artifact@v3
+        with:
+          name: virtualgl-arm32.deb
+          path: ./virtualgl-arm32/path_to_build_output_arm32/virtualgl-arm32.deb
