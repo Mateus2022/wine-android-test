@@ -28,52 +28,64 @@ jobs:
       - name: Set up QEMU
         run: |
           sudo apt-get update
-          sudo apt-get install -y qemu qemu-user-static binfmt-support debootstrap schroot
-
-      - name: Set up ARM environment
-        run: |
-          sudo apt-get install -y qemu-user-static
+          sudo apt-get install -y qemu-user-static debootstrap schroot binfmt-support
           sudo update-binfmts --enable qemu-arm
           sudo update-binfmts --enable qemu-aarch64
 
-      - name: Install dependencies for building VirtualGL
+      - name: Create ARM64 environment with debootstrap
         run: |
-          sudo apt-get install -y build-essential cmake libjpeg-dev libx11-dev libxext-dev
+          sudo debootstrap --arch=arm64 focal /tmp/arm64-chroot http://ports.ubuntu.com/ubuntu-ports/
+          sudo cp /usr/bin/qemu-aarch64-static /tmp/arm64-chroot/usr/bin/
+
+      - name: Create ARM32 environment with debootstrap
+        run: |
+          sudo debootstrap --arch=armhf focal /tmp/arm32-chroot http://ports.ubuntu.com/ubuntu-ports/
+          sudo cp /usr/bin/qemu-arm-static /tmp/arm32-chroot/usr/bin/
+
+      - name: Install dependencies for ARM64 in chroot
+        run: |
+          sudo chroot /tmp/arm64-chroot /bin/bash -c "
+          apt-get update &&
+          apt-get install -y build-essential cmake libjpeg-dev libx11-dev libxext-dev dpkg-dev debhelper"
+
+      - name: Install dependencies for ARM32 in chroot
+        run: |
+          sudo chroot /tmp/arm32-chroot /bin/bash -c "
+          apt-get update &&
+          apt-get install -y build-essential cmake libjpeg-dev libx11-dev libxext-dev dpkg-dev debhelper"
 
       - name: Build VirtualGL for ARM64
         run: |
-          sudo qemu-aarch64-static /bin/bash -c "
-          sudo apt-get update &&
-          sudo apt-get install -y dpkg-dev debhelper &&
-          mkdir -p virtualgl-arm64 &&
-          cd virtualgl-arm64 &&
+          sudo chroot /tmp/arm64-chroot /bin/bash -c "
+          git clone https://github.com/VirtualGL/virtualgl.git &&
+          cd virtualgl &&
+          mkdir build &&
+          cd build &&
           cmake .. &&
           make &&
           make package &&
-          sudo dpkg-deb --build ./path_to_build_output_arm64
-          "
+          dpkg-deb --build ../build"
 
       - name: Build VirtualGL for ARM32
         run: |
-          sudo qemu-arm-static /bin/bash -c "
-          sudo apt-get update &&
-          sudo apt-get install -y dpkg-dev debhelper &&
-          mkdir -p virtualgl-arm32 &&
-          cd virtualgl-arm32 &&
+          sudo chroot /tmp/arm32-chroot /bin/bash -c "
+          git clone https://github.com/VirtualGL/virtualgl.git &&
+          cd virtualgl &&
+          mkdir build &&
+          cd build &&
           cmake .. &&
           make &&
           make package &&
-          sudo dpkg-deb --build ./path_to_build_output_arm32
-          "
+          dpkg-deb --build ../build"
 
       - name: Upload ARM64 .deb package
         uses: actions/upload-artifact@v3
         with:
           name: virtualgl-arm64.deb
-          path: ./virtualgl-arm64/path_to_build_output_arm64/virtualgl-arm64.deb
+          path: /tmp/arm64-chroot/virtualgl/build/virtualgl-arm64.deb
 
       - name: Upload ARM32 .deb package
         uses: actions/upload-artifact@v3
         with:
           name: virtualgl-arm32.deb
-          path: ./virtualgl-arm32/path_to_build_output_arm32/virtualgl-arm32.deb
+          path: /tmp/arm32-chroot/virtualgl/build/virtualgl-arm32.deb
